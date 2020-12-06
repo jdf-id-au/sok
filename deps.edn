@@ -1,0 +1,16 @@
+{:deps {org.clojure/tools.logging {:mvn/version "1.1.0"
+                                   :exclusions [org.clojure/clojure]}
+        io.netty/netty-transport {:mvn/version "4.1.51.Final"}
+        io.netty/netty-transport-native-epoll {:mvn/version "4.1.51.Final"}
+        io.netty/netty-codec {:mvn/version "4.1.51.Final"}
+        io.netty/netty-codec-http {:mvn/version "4.1.51.Final"}
+        io.netty/netty-handler {:mvn/version "4.1.51.Final"}
+        io.netty/netty-handler-proxy {:mvn/version "4.1.51.Final"}
+        io.netty/netty-resolver {:mvn/version "4.1.51.Final"}
+        io.netty/netty-resolver-dns {:mvn/version "4.1.51.Final"}}
+ :paths ["src"]
+ :aliases
+ {:dev {:extra-deps {org.clojure/clojure {:mvn/version "1.10.1"}
+                     org.slf4j/slf4j-simple {:mvn/version "1.7.30"}
+                     hato/hato {:mvn/version "0.7.1"}}
+        :extra-paths ["dev"]}}}
