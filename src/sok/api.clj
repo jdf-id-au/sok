@@ -45,7 +45,7 @@
             text (.text frame)]
         #_(log/debug "received" (count (.text frame)) "characters from"
             (.remoteAddress ch) "on channel id" (.id ch))
-        (if-not (put! in [id text])
+        (when-not (put! in [id text])
           (log/error "Dropped incoming message because in chan is closed" text))))
     (exceptionCaught [^ChannelHandlerContext ctx
                       ^Throwable cause]
@@ -134,7 +134,7 @@
         ws @(hws/websocket uri
               {:on-message
                (fn [ws frame last?]
-                 (if-not (put! raw-in [frame last?])
+                 (when-not (put! raw-in [frame last?])
                    (log/error "Dropped incoming message because aggregator chan is closed" frame)))
                :on-close
                (fn [ws status reason]
