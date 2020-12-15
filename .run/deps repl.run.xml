@@ -1,6 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="deps repl" type="ClojureREPL" factoryName="Local" activateToolWindowBeforeRun="false">
     <module name="sok" />
+    <setting name="displayName" value="deps repl" />
     <setting name="replType" value="NREPL" />
     <setting name="execution" value="DEPS" />
     <setting name="jvmArgs" value="" />
