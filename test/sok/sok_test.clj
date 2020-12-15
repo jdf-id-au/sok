@@ -32,13 +32,18 @@
              (log/warn "already closed")))))
 
 (deftest messages
-  (let [{:keys [clients port path close] :as server} @server
+  (let [{:keys [clients port path close evict] :as server} @server
         client @client
+        client-id (-> @clients keys first)
         short-message "hello"
         ; Can't actually get very near (* 1024 1024); presumably protocol overhead.
+        ; Hangs IDE when trying, annoyingly. TODO debug
         long-message (apply str (repeatedly (* 512 1024) #(char (rand-int 255))))]
+    (is (contains? @clients client-id)) ; hard to imagine this failing, just for symmetry
     (is (= short-message (round-trip short-message client server)))
-    (is (= long-message (round-trip long-message client server)))))
+    (is (= long-message (round-trip long-message client server)))
+    (is (nil? (-> @clients keys first evict deref)))
+    (is (not (contains? @clients client-id)))))
 
 #_ (@client :ws)
 #_ (hws/close! (@client :ws))

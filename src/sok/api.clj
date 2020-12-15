@@ -28,12 +28,13 @@
   (proxy [SimpleChannelInboundHandler] []
     (channelActive [^ChannelHandlerContext ctx]
       (let [ch (.channel ctx)
+            id (.id ch)
             cf (.closeFuture ch)]
         (try (.add channel-group ch)
-             (swap! clients assoc (.id ch) {:addr (.remoteAddress ch)})
+             (swap! clients assoc id {:addr (.remoteAddress ch)})
              (.addListener cf (proxy [ChannelFutureListener] []
                                 (operationComplete [_]
-                                  (swap! clients dissoc (.id ch)))))
+                                  (swap! clients dissoc id))))
              (catch Exception e
                (log/error e "Unable to register channel" ch)))
         (.fireChannelActive ctx))) ; from ChannelInboundHandlerAdapter, although annotated @Skip ..?
@@ -45,7 +46,7 @@
         #_(log/debug "received" (count (.text frame)) "characters from"
             (.remoteAddress ch) "on channel id" (.id ch))
         (if-not (put! in [id text])
-          (log/error "Dropped incoming message because in chan closed" text))))
+          (log/error "Dropped incoming message because in chan is closed" text))))
     (exceptionCaught [^ChannelHandlerContext ctx
                       ^Throwable cause]
       (condp instance? cause
@@ -92,9 +93,11 @@
                  #_(log/debug "about to write" (count msg) "characters to"
                      (.remoteAddress ch) "on channel id" (.id ch))
                  (if ch (.writeAndFlush ch (TextWebSocketFrame. msg))
-                        (log/warn "Tried to write to closed channel" id (get @clients id) msg))
+                        (log/info "Dropped outgoing message because websocket is closed"
+                          id (get @clients id) msg))
                  (recur))
-               (log/info "Stopped sending messages")))]
+               (log/info "Stopped sending messages")))
+         evict (fn [id] (some-> channel-group (.find id) .close))]
      (try (let [bootstrap (doto (ServerBootstrap.)
                             ; TODO any need for separate parent and child groups?
                             (.group loop-group)
@@ -104,10 +107,10 @@
                 server-channel (-> bootstrap .bind .sync)]
             {:close (fn [] (close! out)
                            (some-> server-channel .channel .close .sync)
-                           ; TODO any need to shut down client channels? see `ChannelGroup`
+                           (-> channel-group .close .awaitUninterruptibly)
                            (close! in)
                            (-> loop-group .shutdownGracefully))
-             :port port :path path :in in :out out :clients clients})
+             :port port :path path :in in :out out :clients clients :evict evict})
           (catch Exception e
             (close! out)
             (close! in)
@@ -124,19 +127,20 @@
                 (if last?
                   (if (>! in ret)
                     (recur "")
-                    (log/warn "in chan is closed"))
+                    (log/error "Dropped incoming message because in chan is closed"))
                   (recur ret)))
-              (log/warn "unaggregated chan is closed")))
+              (log/warn "Aggregator chan is closed")))
         out (chan)
         ws @(hws/websocket uri
               {:on-message
                (fn [ws frame last?]
                  (if-not (put! raw-in [frame last?])
-                   (log/error "Dropped incoming message because aggregator chan closed" frame)))
+                   (log/error "Dropped incoming message because aggregator chan is closed" frame)))
                :on-close
                (fn [ws status reason]
                  ; Status codes https://tools.ietf.org/html/rfc6455#section-7.4.1
-                 (log/warn "Websocket closed" status (case reason "" "" (str "because " reason))))})
+                 (log/info "Websocket closed" status (case reason "" "" (str "because " reason))))})
+              ;:on-error ; TODO
         _ (go-loop []
             (if-let [msg (<! out)]
               (do #_(log/debug "about to send" (count msg) "characters from client")
