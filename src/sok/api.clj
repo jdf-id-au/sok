@@ -4,8 +4,9 @@
             [hato.websocket :as hws])
   (:import (io.netty.bootstrap ServerBootstrap)
            (io.netty.channel ChannelHandlerContext
-                             ChannelInitializer)
-           (io.netty.channel SimpleChannelInboundHandler ChannelFutureListener ChannelHandler)
+                             ChannelInitializer
+                             SimpleChannelInboundHandler ChannelFutureListener ChannelHandler
+                             ChannelId)
            (io.netty.channel.nio NioEventLoopGroup)
            (io.netty.channel.group ChannelGroup)
            (io.netty.channel.socket SocketChannel)
@@ -32,9 +33,13 @@
             cf (.closeFuture ch)]
         (try (.add channel-group ch)
              (swap! clients assoc id {:addr (.remoteAddress ch)})
+             (when-not (put! in [id true])
+               (log/error "Unable to report connection because in chan is closed"))
              (.addListener cf (proxy [ChannelFutureListener] []
                                 (operationComplete [_]
-                                  (swap! clients dissoc id))))
+                                  (swap! clients dissoc id)
+                                  (when-not (put! in [id false])
+                                    (log/error "Unable to report disconnection because in chan is closed")))))
              (catch Exception e
                (log/error e "Unable to register channel" ch)))
         (.fireChannelActive ctx))) ; from ChannelInboundHandlerAdapter, although annotated @Skip ..?
@@ -88,10 +93,11 @@
          in (chan)
          out (chan)
          _ (go-loop []
-             (if-let [[id ^String msg] (<! out)]
+             (if-let [[^ChannelId id ^String msg] (<! out)] ; TODO validate
                (let [ch (.find channel-group id)]
                  #_(log/debug "about to write" (count msg) "characters to"
                      (.remoteAddress ch) "on channel id" (.id ch))
+                 ; TODO addFutureListener (see ChannelFutureListener)
                  (if ch (.writeAndFlush ch (TextWebSocketFrame. msg))
                         (log/info "Dropped outgoing message because websocket is closed"
                           id (get @clients id) msg))
