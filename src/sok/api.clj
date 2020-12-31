@@ -123,7 +123,7 @@
         in (chan)
         _ (go-loop [agg ""]
             (if-let [[frame last?] (<! raw-in)]
-              (let [ret (str agg frame)]
+              (let [ret (str agg frame)] ; TODO warn if large, abort if huge?
                 (if last?
                   (if (>! in ret)
                     (recur "")
