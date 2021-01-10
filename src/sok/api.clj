@@ -108,6 +108,7 @@
                             ; TODO any need for separate parent and child groups?
                             (.group loop-group)
                             (.channel NioServerSocketChannel)
+                            ; (.handler (LoggingHandler. LogLevel/INFO))
                             (.localAddress ^int (InetSocketAddress. port))
                             (.childHandler (pipeline path opts channel-group clients in)))
                 server-channel (-> bootstrap .bind .sync)]
@@ -150,7 +151,7 @@
         _ (go-loop []
             (if-let [msg (<! out)]
               (do #_(log/debug "about to send" (count msg) "characters from client")
-                (hws/send! ws msg)
+                (hws/send! ws msg) ; TODO accommodates `:last?`... does that mean we should partition?
                 (recur))
               (log/info "Stopped sending messages")))]
     {:ws ws :in in :out out}))
